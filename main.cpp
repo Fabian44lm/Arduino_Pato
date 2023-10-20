@@ -1,155 +1,110 @@
-// NN3002B.502
-// Pato: ESP32 con SIM800L integrada
-// Cálculo de temperatura con envío de datos
-// Rodrigo Moreno Juárez
-// 14 de octubre de 2023
-
 #include <Arduino.h>
-#include <WiFi.h>
-#include <PubSubClient.h>
 
-void setup_wifi(); // Función para conectarse a Wi-Fi
-void callback(char*, byte*, unsigned int); // Función para procesar mensajes recibidos por MQTT
-void reconnect(); // Función para conectarse a MQTT
-float readTemp(); // Función para leer la temperatura
+/*
+  Rui Santos
+  Complete project details at https://RandomNerdTutorials.com/esp32-sim800l-send-text-messages-sms/
+  
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files.
+  
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+*/
 
-const int ThermistorPin = 35;         // Pin de datos del termistor (pines 2, 4 no funcionan por uso de Wi-Fi)
-const int SeriesResistor = 10000;     // Resistencia en serie con el termistor [ohms]
-const int ThermistorNominal = 10000;  // Resistencia del termistor a la temperatura nominal [ohms]
-const int NominalTemp = 25;           // Temperatura para resistencia nominal del termistor [ºC]
-const int BCoefficient = 3950;        // Coeficiente beta del termistor [ºC]
-const int NumSamples = 20;            // Número de muestras para sacar un promedio de lecturas
-int samples[NumSamples];              // Arreglo con las muestras
+// SIM card PIN (leave empty, if not defined)
+const char simPIN[]   = "1111";
 
-const char* ssid = "Totalplay-4EA5";
-const char* password =  "4EA54C27Ukm4kysW";
-const char* mqtt_server = "broker.mqtt-dashboard.com";
-const char* topico_salida = "equipoPATO";
-const char* topico_entrada = "equipoPATO";
+// Your phone number to send SMS: + (plus sign) and country code, for Portugal +351, followed by phone number
+// SMS_TARGET Example for Portugal +351XXXXXXXXX
+#define SMS_TARGET  "+528180827303"
 
-const int MSG_BUFFER_SIZE = 80;       // Tamaño de buffer del mensaje
-char msg[MSG_BUFFER_SIZE];            // Generar un arreglo para el mensaje
+// Configure TinyGSM library
+#define TINY_GSM_MODEM_SIM800      // Modem is SIM800
+#define TINY_GSM_RX_BUFFER   1024  // Set RX buffer to 1Kb
 
-WiFiClient espClient;
-PubSubClient client(espClient);
+#include <Wire.h>
+#include <TinyGsmClient.h>
+
+// TTGO T-Call pins
+#define MODEM_RST            5
+#define MODEM_PWKEY          4
+#define MODEM_POWER_ON       23
+#define MODEM_TX             27
+#define MODEM_RX             26
+#define I2C_SDA              21
+#define I2C_SCL              22
+
+// Set serial for debug console (to Serial Monitor, default speed 115200)
+#define SerialMon Serial
+// Set serial for AT commands (to SIM800 module)
+#define SerialAT  Serial1
+
+// Define the serial console for debug prints, if needed
+//#define DUMP_AT_COMMANDS
+
+#ifdef DUMP_AT_COMMANDS
+  #include <StreamDebugger.h>
+  StreamDebugger debugger(SerialAT, SerialMon);
+  TinyGsm modem(debugger);
+#else
+  TinyGsm modem(SerialAT);
+#endif
+
+#define IP5306_ADDR          0x75
+#define IP5306_REG_SYS_CTL0  0x00
+
+bool setPowerBoostKeepOn(int en){
+  Wire.beginTransmission(IP5306_ADDR);
+  Wire.write(IP5306_REG_SYS_CTL0);
+  if (en) {
+    Wire.write(0x37); // Set bit1: 1 enable 0 disable boost keep on
+  } else {
+    Wire.write(0x35); // 0x37 is default reg value
+  }
+  return Wire.endTransmission() == 0;
+}
 
 void setup() {
-  Serial.begin(9600);
-  setup_wifi();
-  client.setServer(mqtt_server, 1883);
-  client.setCallback(callback);
-  if (!client.connected()) {
-    reconnect();
+  // Set console baud rate
+  SerialMon.begin(9600);
+
+  // Keep power when running from battery
+  Wire.begin(I2C_SDA, I2C_SCL);
+  bool isOk = setPowerBoostKeepOn(1);
+  SerialMon.println(String("IP5306 KeepOn ") + (isOk ? "OK" : "FAIL"));
+
+  // Set modem reset, enable, power pins
+  pinMode(MODEM_PWKEY, OUTPUT);
+  pinMode(MODEM_RST, OUTPUT);
+  pinMode(MODEM_POWER_ON, OUTPUT);
+  digitalWrite(MODEM_PWKEY, LOW);
+  digitalWrite(MODEM_RST, HIGH);
+  digitalWrite(MODEM_POWER_ON, HIGH);
+
+  // Set GSM module baud rate and UART pins
+  SerialAT.begin(9600, SERIAL_8N1, MODEM_RX, MODEM_TX);
+  delay(3000);
+
+  // Restart SIM800 module, it takes quite some time
+  // To skip it, call init() instead of restart()
+  SerialMon.println("Initializing modem...");
+  modem.restart();
+  // use modem.init() if you don't need the complete restart
+
+  // Unlock your SIM card with a PIN if needed
+  if (strlen(simPIN) && modem.getSimStatus() != 3 ) {
+    modem.simUnlock(simPIN);
   }
 }
 
 void loop() {
-  float t;
-  if (!client.connected()) {
-    reconnect();
+    // To send an SMS, call modem.sendSMS(SMS_TARGET, smsMessage)
+  String smsMessage = "Hello from ESP32!";
+  if(modem.sendSMS(SMS_TARGET, smsMessage)){
+    SerialMon.println(smsMessage);
   }
-  client.loop();
-  t = readTemp();
-  snprintf (msg, MSG_BUFFER_SIZE, "{\"dispositivo\":\"Refrigerador 1\",\"tipo\":\"Temperatura\",\"dato\":%.2f}", t*1.0);
-  client.publish(topico_entrada, msg); 
-
-  delay(5000);
-}
-
-void setup_wifi() {
-  WiFi.begin(ssid, password);
-    Serial.print("\nConnecting");
-
-    while(WiFi.status() != WL_CONNECTED){
-        Serial.print(".");
-        delay(100);
-    }
-
-    Serial.print("\nConnected to the WiFi network ");
-    Serial.println(ssid);
-    Serial.print("Local ESP32 IP: ");
-    Serial.println(WiFi.localIP());
-}
-
-void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
+  else{
+    SerialMon.println("SMS failed to send");
   }
-  Serial.println();
-}
-
-void reconnect() { // Función para conectarse a MQTT
-  while (!client.connected()) {
-    Serial.print("Attempting MQTT connection... ");
-    // Create a random client ID
-    String clientId = "ESP8266Client-";
-    clientId += String(random(0xffff), HEX);
-    // Attempt to connect
-    if (client.connect(clientId.c_str())) {
-      Serial.println("connected.");
-      // Once connected, publish an announcement...
-      //client.publish("outTopic", "hello world");
-      // ... and resubscribe
-      //client.subscribe("inTopic");
-      client.subscribe(topico_entrada);
-      client.subscribe(topico_salida);   
-    } else {
-      Serial.print("Failed, rc = ");
-      Serial.print(client.state());
-      Serial.println(". Try again in 5 seconds.");
-      // Wait 5 seconds before retrying
-      delay(5000);
-    }
-  }
-}
-
-float readTemp() { // Función para leer la temperatura del termistor
-  uint8_t i; // Definición de contador (entero de un byte sin signo).
-  float average;
- 
-  // Tomar N muestras y guardarlas en el arreglo con un pequeño delay
-  for (i = 0; i < NumSamples; i++) {
-   samples[i] = analogRead(ThermistorPin);
-   delay(10);
-  }
- 
-  // Promediar las muestras
-  average = 0;
-  for (i = 0; i < NumSamples; i++) {
-     average += samples[i];
-  }
-  average /= NumSamples;
- 
-  Serial.print("Average analog reading "); 
-  Serial.println(average);
-
-  // Convertir el valor análogo a una resistencia
-  average = (4095 / average)  - 1;     // (4095 / ADC - 1). 4095 por tener un ADC de 12 bits (0-4095).
-  average = SeriesResistor / average;  // 10K / (4095 / ADC - 1)
-  Serial.print("Thermistor resistance "); 
-  Serial.print(average);
-  Serial.println(" ohms");
-  
-  // Utilizar la ecuación simplificada del parámetro B para un termistor: 1/T = 1/T_0 + (1/B) * ln(R/R_0)
-    // T = temperatura medida [K]
-    // T_0 = temperatura nominal absoluta [K]
-    // B = parámetro beta del termistor [K]
-    // R = resistencia medida [ohms]
-    // R_0 = resistencia a la temperatura nominal [ohms]
-  float steinhart;
-  steinhart = average / ThermistorNominal;        // R/R_0
-  steinhart = log(steinhart);                     // ln(R/R_0)
-  steinhart /= BCoefficient;                      // 1/B * ln(R/R_0)
-  steinhart += 1.0 / (NominalTemp + 273.15);      // + (1/T_0)
-  steinhart = 1.0 / steinhart;                    // Invertir
-  steinhart -= 273.15;                            // Convertir temperatura absoluta [K] a Celsius [ºC]
-  
-  Serial.print("Temperature "); 
-  Serial.print(steinhart);
-  Serial.println(" ºC");
-
-  return steinhart;
+  delay(10000);
 }
