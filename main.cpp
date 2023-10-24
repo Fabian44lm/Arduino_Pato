@@ -1,7 +1,6 @@
 // NN3002B.502
 // Pato: ESP32 con SIM800L integrada
 // Cálculo de temperatura con envío de datos
-// Rodrigo Moreno Juárez
 // 14 de octubre de 2023
 
 #include <Arduino.h>
