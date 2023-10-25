@@ -63,7 +63,6 @@ void setup_wifi() {
         Serial.print(".");
         delay(100);
     }
-
     Serial.print("\nConnected to the WiFi network ");
     Serial.println(ssid);
     Serial.print("Local ESP32 IP: ");
