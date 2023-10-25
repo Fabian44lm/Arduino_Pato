@@ -131,13 +131,19 @@ float readTemp() { // Función para leer la temperatura del termistor
   Serial.print(average);
   Serial.println(" ohms");
   
+  // Utilizar la ecuación simplificada del parámetro B para un termistor: 1/T = 1/T_0 + (1/B) * ln(R/R_0)
+    // T = temperatura medida [K]
+    // T_0 = temperatura nominal absoluta [K]
+    // B = parámetro beta del termistor [K]
+    // R = resistencia medida [ohms]
+    // R_0 = resistencia a la temperatura nominal [ohms]
   float steinhart;
-  steinhart = average / ThermistorNominal;        
-  steinhart = log(steinhart);                     
-  steinhart /= BCoefficient;                      
-  steinhart += 1.0 / (NominalTemp + 273.15);      
-  steinhart = 1.0 / steinhart;                    
-  steinhart -= 273.15;                            
+  steinhart = average / ThermistorNominal;        // R/R_0
+  steinhart = log(steinhart);                     // ln(R/R_0)
+  steinhart /= BCoefficient;                      // 1/B * ln(R/R_0)
+  steinhart += 1.0 / (NominalTemp + 273.15);      // + (1/T_0)
+  steinhart = 1.0 / steinhart;                    // Invertir
+  steinhart -= 273.15;                            // Convertir temperatura absoluta [K] a Celsius [ºC]
   
   Serial.print("Temperature "); 
   Serial.print(steinhart);
