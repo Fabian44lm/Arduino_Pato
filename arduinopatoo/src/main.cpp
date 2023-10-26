@@ -3,6 +3,7 @@
 // Cálculo de temperatura con envío de datos
 // 14 de octubre de 2023
 
+#include <stack>
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
@@ -31,6 +32,10 @@ char msg[MSG_BUFFER_SIZE];            // Generar un arreglo para el mensaje
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+
+void Stack_remove() {
+  return;
+}
 
 void setup() {
   Serial.begin(9600);

@@ -1,17 +1,17 @@
 #include "TemperatureSensor.h"
+#include <iostream>
 
-const int ThermistorPin = 35;         // Pin de datos del termistor (pines 2, 4 no funcionan por uso de Wi-Fi)
-const int SeriesResistor = 10000;     // Resistencia en serie con el termistor [ohms]
-const int ThermistorNominal = 10000;  // Resistencia del termistor a la temperatura nominal [ohms]
-const int NominalTemp = 25;           // Temperatura para resistencia nominal del termistor [ºC]
-const int BCoefficient = 3950;        // Coeficiente beta del termistor [ºC]
-const int NumSamples = 20; 
-
-TemperatureSensor::TemperatureSensor(int thermistorPin, int SeriesResistor, int ThermistorNominal, int nominalTemp, int bCoefficient, int numSamples) {
-    
+TemperatureSensor::TemperatureSensor(float Tmin, float Tmax)
+{
+    this->Tmin = Tmin;
+    this->Tmax = Tmax;
+    readTemp();
     
 }
 
-// float TemperatureSensor::readTemperature() {
-    
-// }
+float TemperatureSensor::readTemp()
+{
+    // Implementa la lógica para leer la temperatura
+    // Puedes utilizar las variables miembro y otros métodos de la clase
+    return 0.0;  // Solo un valor de ejemplo
+}
