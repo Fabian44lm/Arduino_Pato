@@ -7,11 +7,13 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <TemperatureSensor.h>
+
 
 void setup_wifi(); // Función para conectarse a Wi-Fi
 void callback(char*, byte*, unsigned int); // Función para procesar mensajes recibidos por MQTT
 void reconnect(); // Función para conectarse a MQTT
-float readTemp(); // Función para leer la temperatura
+// float readTemp(); // Función para leer la temperatura
 
 const int ThermistorPin = 35;         // Pin de datos del termistor (pines 2, 4 no funcionan por uso de Wi-Fi)
 const int SeriesResistor = 10000;     // Resistencia en serie con el termistor [ohms]
@@ -30,6 +32,8 @@ const char* topico_entrada = "equipoPATO";
 const int MSG_BUFFER_SIZE = 80;       // Tamaño de buffer del mensaje
 char msg[MSG_BUFFER_SIZE];            // Generar un arreglo para el mensaje
 
+TemperatureSensor sensor(10.0, 30.0);
+
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -45,20 +49,19 @@ void setup() {
   if (!client.connected()) {
     reconnect();
   }
+  
 }
 
 void loop() {
-  float t;
   if (!client.connected()) {
     reconnect();
   }
   client.loop();
-  t = readTemp();
+  float t = sensor.readTemp();
   snprintf (msg, MSG_BUFFER_SIZE, "{\"dispositivo\":\"Refrigerador 1\",\"tipo\":\"Temperatura\",\"dato\":%.2f}", t*1.0);
   client.publish(topico_entrada, msg); 
 
   delay(5000);
-  
 }
 
 void setup_wifi() {
@@ -110,44 +113,46 @@ void reconnect() { // Función para conectarse a MQTT
   }
 }
 
-float readTemp() { // Función para leer la temperatura del termistor
-  uint8_t i; // Definición de contador (entero de un byte sin signo).
-  float average;
- 
-  // Tomar N muestras y guardarlas en el arreglo con un pequeño delay
-  for (i = 0; i < NumSamples; i++) {
-   samples[i] = analogRead(ThermistorPin);
-   delay(10);
-  }
- 
-  // Promediar las muestras
-  average = 0;
-  for (i = 0; i < NumSamples; i++) {
-     average += samples[i];
-  }
-  average /= NumSamples;
- 
-  Serial.print("Average analog reading "); 
-  Serial.println(average);
 
-  // Convertir el valor análogo a una resistencia
-  average = (4095 / average)  - 1;     // (4095 / ADC - 1). 4095 por tener un ADC de 12 bits (0-4095).
-  average = SeriesResistor / average;  // 10K / (4095 / ADC - 1)
-  Serial.print("Thermistor resistance "); 
-  Serial.print(average);
-  Serial.println(" ohms");
-  
-  float steinhart;
-  steinhart = average / ThermistorNominal;        
-  steinhart = log(steinhart);                     
-  steinhart /= BCoefficient;                      
-  steinhart += 1.0 / (NominalTemp + 273.15);      
-  steinhart = 1.0 / steinhart;                    
-  steinhart -= 273.15;                            
-  
-  Serial.print("Temperature "); 
-  Serial.print(steinhart);
-  Serial.println(" ºC");
 
-  return steinhart;
-}
+// float readTemp() { // Función para leer la temperatura del termistor
+//   uint8_t i; // Definición de contador (entero de un byte sin signo).
+//   float average;
+ 
+//   // Tomar N muestras y guardarlas en el arreglo con un pequeño delay
+//   for (i = 0; i < NumSamples; i++) {
+//    samples[i] = analogRead(ThermistorPin);
+//    delay(10);
+//   }
+ 
+//   // Promediar las muestras
+//   average = 0;
+//   for (i = 0; i < NumSamples; i++) {
+//      average += samples[i];
+//   }
+//   average /= NumSamples;
+ 
+//   Serial.print("Average analog reading "); 
+//   Serial.println(average);
+
+//   // Convertir el valor análogo a una resistencia
+//   average = (4095 / average)  - 1;     // (4095 / ADC - 1). 4095 por tener un ADC de 12 bits (0-4095).
+//   average = SeriesResistor / average;  // 10K / (4095 / ADC - 1)
+//   Serial.print("Thermistor resistance "); 
+//   Serial.print(average);
+//   Serial.println(" ohms");
+  
+//   float steinhart;
+//   steinhart = average / ThermistorNominal;        
+//   steinhart = log(steinhart);                     
+//   steinhart /= BCoefficient;                      
+//   steinhart += 1.0 / (NominalTemp + 273.15);      
+//   steinhart = 1.0 / steinhart;                    
+//   steinhart -= 273.15;                            
+  
+//   Serial.print("Temperature "); 
+//   Serial.print(steinhart);
+//   Serial.println(" ºC");
+
+//   return steinhart;
+// }
