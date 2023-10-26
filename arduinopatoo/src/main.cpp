@@ -58,6 +58,7 @@ void loop() {
   client.publish(topico_entrada, msg); 
 
   delay(5000);
+  
 }
 
 void setup_wifi() {

@@ -9,7 +9,7 @@ class TemperatureSensor {
 public:
     TemperatureSensor(float Tmin, float Tmax);
     float readTemp();
-    bool isTempValid();
+    bool IsTempValid();
 private:
     int temperature;
     const int thermistorPin = 35;         // Pin de datos del termistor (pines 2, 4 no funcionan por uso de Wi-Fi)
@@ -21,6 +21,9 @@ private:
     int* samples;              // Arreglo con las muestras
     float Tmin;
     float Tmax;
+    uint8_t i;
+    float average;
+    float steinhart;
 };
 
 #endif
