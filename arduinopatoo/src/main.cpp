@@ -59,8 +59,8 @@ void loop() {
   client.loop();
   float t = sensor.readTemp();
   snprintf (msg, MSG_BUFFER_SIZE, "{\"dispositivo\":\"Refrigerador 1\",\"tipo\":\"Temperatura\",\"dato\":%.2f}", t*1.0);
-  client.publish(topico_entrada, msg); 
-
+  client.publish(topico_entrada, msg);
+  Serial.print(sensor.IsTempValid());
   delay(5000);
 }
 
